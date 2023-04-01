@@ -42,7 +42,7 @@ def set_gitdir():
 
 
 class git():
-	def __init__(self, path=None, email=None, name=None, token=None, init=False, url=None, store_type='local'):
+	def __init__(self, path=None, url=None, init=False, email=None, name=None, token=None, store_type='local'):
 		self.test_git()
 		self.store_type = store_type
 		self.path = None
