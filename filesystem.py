@@ -169,7 +169,11 @@ class filesystem():
 		elif os.path.isfile(src_path):
 			self._mv_file(src_path, dest_path)
 
-	def touch(self, filepath):
+	def touch(self, filepath, create_dirs=True):
+		path = os.path.dirname(filepath)
+		if not os.path.exists(path) and create_dirs:
+			log(f"filesystem.touch():Path doesn't exist! Creating...", 'warning')
+			self.mkdir(path)
 		with open(filepath, 'w') as f:
 			data = ''
 			f.write(data)
