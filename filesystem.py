@@ -178,3 +178,29 @@ class filesystem():
 			data = ''
 			f.write(data)
 			f.close()
+
+	def write(self, data, filepath, force=False):
+		go = False
+		if os.path.exists(filepath):
+			if force:
+				txt = f"filesystem.write():Error - File Exists! (use force=True to overwrite!)"
+				go = True
+			else:
+				txt = None
+				go = False
+		else:
+			go = True
+		if go:
+			try:
+				with open(filepath, 'w') as f:
+					f.write(data)
+					f.close()
+				return True
+			except Exception as e:
+				txt = f"filesystem.write():Error - {e}"
+				log(txt, 'error')
+				return False
+		else:
+			log(txt, 'error')
+			return False
+			
