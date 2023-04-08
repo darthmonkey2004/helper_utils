@@ -880,8 +880,19 @@ class git_mgr():
 				l.append(f"{k} - {function_data[command]}")
 		return "\n".join(l)
 
+	def rm_junk_files(self):
+		paths = self.fs.find(pattern="__pycache__")
+		for path in paths:
+			try:
+				self.fs.rm(path)
+			except Exception as e:
+				log(f"git.rm_junk_files():Error - {e}", 'error')
+				return False
+		return True
+
 
 	def push(self, commit_message=None, force=False):
+		self.rm_junk_files()
 		if not self._write_token_file():
 			print("Error! Aborting...")
 			return False
