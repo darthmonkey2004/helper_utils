@@ -84,9 +84,13 @@ class filesystem():
 			os.rmdir(path)
 			log(f"filesystem._rm_dir():Removed directory: {path}!", 'info')
 		elif is_dir and not is_empty and not force:
-			txt = f"filesystem._rm_dir():Error - Directory not empty! (path='{path}')"
+			txt = f"filesystem._rm_dir():Error - Directory not empty! (path='{path}') - Using subprocess..."
 			log(txt, 'error')
-			raise OSError(txt)
+			try:
+				subprocess.call(f"rm -rf \"{path}\"")
+			except Exception as e:
+				txt = f"{txt} - {e}"
+				raise Exception(txt)
 		elif is_dir and not is_empty and force:
 			log(f"filesystem._rm_dir():Directory not empty! Removing directory contents.. (force=True)", 'warning')
 			files = self.ls(path)
@@ -203,4 +207,15 @@ class filesystem():
 		else:
 			log(txt, 'error')
 			return False
+
+	def find(self, path=None, pattern="*.*"):
+		self.pattern = pattern
+		if path is None:
+			path = self.cwd
+		try:
+			return subprocess.check_output(f"find \"{path}\" -name \"{pattern}\"", shell=True).decode().strip().splitlines()
+		except Exception as e:
+			txt = f"filesystem.find():Error - {e}"
+			log(txt, 'error')
+			return []
 			
