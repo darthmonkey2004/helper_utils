@@ -109,7 +109,7 @@ class tar():
 				pass
 		return test1
 
-	def add_directory(self, target_dir=None, tar_file=None):
+	def add_directory(self, target_dir=None, archive_name=None):
 		"""Adds the contents (all files/folders) to an archive ('target_dir').
 		If compression scheme is None, uses 'tar' extension (no compression)."""
 
@@ -117,12 +117,12 @@ class tar():
 			self.target_dir = target_dir
 			log(f"tar.add_directory():Target directory changed! ({self.target_directory})", 'info')
 		files = self.get_files(self.target_dir)
+		if archive_name is None:
+			archive_name = os.path.basename(self.target_dir)
 		cwd = os.getcwd()
 		dest_path = self.get_common_path(files)
 		path = os.path.dirname(self.target_dir)
-		if tar_file is None:
-			archive_name = os.path.basename(self.target_dir)
-			tar_file = os.path.join(dest_path, f"{archive_name}.{self.ext}")
+		tar_file = os.path.join(dest_path, f"{archive_name}.{self.ext}")
 		fp = tarfile.open(tar_file, self.write_mode)
 		for filepath in files:
 			fname = os.path.basename(filepath)
@@ -134,23 +134,5 @@ class tar():
 		os.chdir(cwd)
 		log(f"Tar archive created! Location:{tar_file}", 'info')
 		return tar_file
-
-	def compress(self, target, tar_file=None):
-		if not os.path.exists(target):
-			txt = f"Error - target doesn't exist! ({target})"
-			log(txt, 'error')
-			raise Exception(txt)
-		if tarfile is None:
-			archive_name = os.path.basename(target)
-			tar_file = os.path.join(os.getcwd(), f"{archive_name}.{self.ext}")
-		if os.path.isfile(target):
-			self.add_file(target=target, tar_file=tar_file)
-			log(f"Added {target} to {tar_file}!", 'info')
-		elif os.path.isdir(target):
-			log(f"Adding contents of {target} to {tar_file}...", 'info')
-			self.add_directory(target_dir=target, tar_file=tar_file)
-
-			
-			
 		
 

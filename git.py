@@ -123,10 +123,9 @@ class git_mgr():
 			os.chdir(self.path)
 		if name is not None:
 			self.name = name
-			self.url = f"https://github.com/{self.email}/{self.name}.git"
 		else:
-			self.name = 'default'
-			self.url = None
+			self.name = os.path.basename(self.path)
+		self.url = f"https://github.com/{self.email}/{self.name}.git"
 		valid, msg = self.is_repo(self.path)
 		if not valid:
 			raise Exception(Exception, msg)
@@ -147,6 +146,8 @@ class git_mgr():
 			print("Your local branch is ahead of remote! (Update with git.push())")
 		if self.settings is None:
 			self.save_settings()
+		if self.user is None:
+			self.user = self.email.split('@')[0]
 
 	def del_branch(self, branch=None, safe=None):
 		if safe is None:
@@ -538,15 +539,18 @@ class git_mgr():
 		return self.path
 
 	def clone(self, repo_url=None):
-		if repo_url is None:
-			repo_url = self.url
+		if repo_url is not None:
+			self.url = repo_url
 		repo_name = os.path.splitext(os.path.basename(repo_url))[0]
 		if repo_name in os.getcwd():
 			self.path = os.getcwd()
+			createin = os.path.dirname(self.path)
 		else:
 			self.path = os.path.join(os.getcwd(), repo_name)
-		os.chdir(self.path)
+			createin = os.getcwd()
+		os.chdir(createin)
 		ret = subprocess.check_output(f"cd \"{self.path}\"; git clone \"{self.url}\"", shell=True).decode().strip()
+		os.chdir(self.path)
 		self.get_repo_info()
 		return self.path
 
@@ -881,7 +885,7 @@ class git_mgr():
 		return "\n".join(l)
 
 	def rm_junk_files(self):
-		paths = self.fs.find(pattern="__pycache__")
+		paths = self.fs.find(path=self.path, pattern="__pycache__")
 		for path in paths:
 			try:
 				self.fs.rm(path)
