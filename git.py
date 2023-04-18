@@ -2,6 +2,7 @@
 
 import pickle
 from helper_utils.filesystem import filesystem
+from helper_utils.log import logger
 from pathlib import Path
 import subprocess
 import pexpect
@@ -92,45 +93,66 @@ def get_repositories(user='darthmonkey2004'):
 
 class git_mgr():
 	def __init__(self, path=None, url=None, init=False, email=None, name=None, token=None, store_type='local', update=True, safe=True):
+		self.path = path
+		self.logfile = os.path.join(os.path.expanduser("~"), "gitlog.log")
+		self.log = logger(logfile=self.logfile, verbose=True).log_msg
 		self.settings = None
+		self.url = url
 		self.safe = safe
+		self.initialized = False
 		if path is None and url is None:
 			self.settings = self.load_settings()
-			os.chdir(self.path)
+			if self.path is not None:
+				os.chdir(self.path)
 		self.update = update
 		self.update_needed = False
 		self.test_git()
 		self.store_type = store_type
-		self.path = None
 		self.push_needed = False
 		self.commit_needed = False
 		self.email = None
 		self.user = None
 		self.fs = filesystem()
+		cont = True
+		if path is not None:
+			valid, msg = self.is_repo(self.path)
+			if not valid and self.path is None:
+				self.log(f"Path provided but not a valid repo (valid={valid}, msg={msg}): {path}. Adding new..", 'info')
+				self.path = self.add_new_repo(path=path)
+				cont = True
+			elif self.path is None:
+				raise Exception("Error: path is None!")
+			else:
+				cont = True
+		elif url is not None:
+			self.path = self.add_new_repo(url=url)
+			self.log(f"url provided: {url}", 'info')
+		elif init:
+			self.path = self.add_new_repo(init=True, name=name)
+			self.log(f"No url or path (init=True): name={name}", 'info')
+		else:
+			cont = False
+			txt = "Error! No repo found, provided, or init method given (clone, url, or init)"
+			self.log(txt, 'error')
+		if cont:
+			os.chdir(self.path)
+			if name is not None:
+				self.name = name
+			else:
+				self.name = os.path.basename(self.path)
+			self.url = f"https://github.com/{self.email}/{self.name}.git"
+			valid, msg = self.is_repo(self.path)
+			if not valid:
+				self.log(f"Error - Not a valid repo!", 'error')
+				#raise Exception(Exception, msg)
+			else:
+				self.add_local_repo()
+
+
+	def add_local_repo(self, path=None, token=None):
 		if path is not None:
 			self.path = path
-		else:
-			if init:
-				self.path = self.new_repo()
-			elif url is not None:
-				self.path = self.clone(repo_url=url)
-			else:
-				self.path = os.getcwd()
-		if self.path is None:
-			txt = "Error! No repo found, provided, or init method given (clone, url, or init"
-			raise Exception(Exception, txt)
-		else:
-			os.chdir(self.path)
-		if name is not None:
-			self.name = name
-		else:
-			self.name = os.path.basename(self.path)
-		self.url = f"https://github.com/{self.email}/{self.name}.git"
-		valid, msg = self.is_repo(self.path)
-		if not valid:
-			raise Exception(Exception, msg)
-		else:
-			self.get_repo_info(self.path)
+		self.get_repo_info(self.path)
 		if self.email is None:
 			self.email = self.get_email()
 		if token is None:
@@ -148,6 +170,59 @@ class git_mgr():
 			self.save_settings()
 		if self.user is None:
 			self.user = self.email.split('@')[0]
+
+
+	def _add_new_repo_fromData(self, path=None):
+		if path is not None:
+			self.path = path
+		os.chdir(self.path)
+		self.name = os.path.basename(self.path)
+		ret, self.email = self.sh("git config --global --get user.email")
+		self.user = self.email.split('@')[0]
+		self.url = f"https://github.com/{self.user}/{self.name}.git"
+		print("url:", self.url)
+		ret, msg = self.sh("git init")
+		print(ret, msg)
+		ret, msg = self.sh("git symbolic-ref HEAD refs/heads/main")
+		print(ret, msg)
+		ret, msg = self.sh("git add .")
+		print(ret, msg)
+		ret, msg = self.sh("git commit -m \"test commit\"")
+		print(ret, msg)
+		ret, msg = self.sh(f"git remote add origin {self.url}")
+		print(ret, msg)
+		ret, msg = self.sh(f"git remote -v")
+		print(ret, msg)
+		ret, msg = self.sh(f"git config --local user.email={self.email}")
+		print(ret, msg)
+		return self.path
+
+
+	def add_new_repo(self, path=None, url=None, name=None, init=False):
+		if init:
+			if name is None and path is None:
+				txt = f"git.add_new_repo():Error - No url, repo name, or path to local repository provided!"
+				self.log(txt, 'error')
+				raise Exception(txt)
+			elif name is not None:
+				path = os.path.join(os.getcwd(), name)
+			elif path is not None:
+				name = os.path.basename(path)
+			self.path = self.new_repo(open_browser=True)
+		else:
+			if path is None and url is None:
+				txt = f"git.add_new_repo():Error - No url or path to local repository provided!"
+				self.log(txt, 'error')
+				raise Exception(txt)
+			if path is not None:
+				self.path = self._add_new_repo_fromData(path=path)
+			elif url is not None:
+				self.path = self.clone(repo_url=url)
+		return self.path
+
+
+
+
 
 	def del_branch(self, branch=None, safe=None):
 		if safe is None:
@@ -199,6 +274,9 @@ class git_mgr():
 			txt = "Error saving settings:{e}"
 			raise Exception(txt)
 
+	def clear_settings(self):
+		self._save_settings()
+		self.log(f"git.clear_settings():Settings data cleared!", 'info')
 
 	def save_settings(self, settings_file=None):
 		if settings_file is not None:
@@ -210,6 +288,7 @@ class git_mgr():
 		d = {}
 		for var in vars:
 			d[var] = self.__dict__[var]
+		d['initialized'] = True
 		self._save_settings(settings=d, settings_file=self.settings_file)
 		return self.settings
 
@@ -220,8 +299,12 @@ class git_mgr():
 			self.settings = self._load_settings(settings_file=settings_file)
 			for k in self.settings.keys():
 				self.__dict__[k] = self.settings[k]
-			print("Settings loaded successfully!")
+			if self.settings != {}:
+				self.log("Settings loaded successfully!", 'info')
+			else:
+				self.log("Settings are empty!", 'warning')
 			return self.settings
+			
 		except Exception as e:
 			txt = f"Error loading settings: {e}"
 			raise Exception(txt)
@@ -240,6 +323,8 @@ class git_mgr():
 			with open(settings_file, 'rb') as f:
 				self.settings = pickle.load(f)
 				f.close()
+			for k in self.settings.keys():
+				self.__dict__[k] = self.settings[k]
 			return self.settings
 		except Exception as e:
 			txt = f"Error loading settings:{e}"
@@ -477,9 +562,10 @@ class git_mgr():
 			print("Error installing git:", e)
 			return False
 
-	def new_repo(self, name=None, path=None):
-		c = input("Opening browser. Create a new repo, then press enter to continue...")
-		self._browse_create_repo()
+	def new_repo(self, name=None, path=None, open_browser=True):
+		if open_browser:
+			c = input("Opening browser. Create a new repo, then press enter to continue...")
+			self._browse_create_repo()
 		print("This function assumes you've already added a new repo on github!")
 		if path is None:
 			if name is None:
@@ -748,7 +834,7 @@ class git_mgr():
 			return True, None
 
 	def sh(self, com):
-		if 'git' not in com:# restrict shell commands to contain the 'git' command in string.
+		if 'git' not in com and 'gh' not in com:# restrict shell commands to contain the 'git' command in string.
 			txt = f"Error - invalid git string: {com}"
 			raise Exception(txt)
 		try:
@@ -890,7 +976,7 @@ class git_mgr():
 			try:
 				self.fs.rm(path)
 			except Exception as e:
-				log(f"git.rm_junk_files():Error - {e}", 'error')
+				self.log(f"git.rm_junk_files():Error - {e}", 'error')
 				return False
 		return True
 

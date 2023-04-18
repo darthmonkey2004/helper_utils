@@ -99,6 +99,24 @@ class filesystem():
 				self._rm_file(filepath)
 			os.rmdir(path)
 
+	def snd(self, path, pattern):# Search and destroy files by pattern
+		if type(pattern) != list:
+			patterns = [pattern]
+		else:
+			patterns = pattern
+		for pattern in patterns:
+			files = self.find(path=path, pattern=pattern)
+			pos = 0
+			for filepath in files:
+				log(f"filesystem.snd():Removing file: {filepath}...", 'info')
+				try:
+					self.rm(filepath)
+					pos += 1
+				except Exception as e:
+					log(f"filesystem.snd():Error - {e}", 'error')
+					break
+			log(f"filesystem.snd():{pos} files removed!", 'info')
+
 	def _rm_file(self, path):
 		if os.path.exists(path):
 			os.remove(path)
@@ -209,13 +227,31 @@ class filesystem():
 			return False
 
 	def find(self, path=None, pattern="*.*"):
-		self.pattern = pattern
 		if path is None:
 			path = self.cwd
-		try:
-			return subprocess.check_output(f"find \"{path}\" -name \"{pattern}\"", shell=True).decode().strip().splitlines()
-		except Exception as e:
-			txt = f"filesystem.find():Error - {e}"
+		if type(pattern) != list:
+			patterns = [pattern]
+		else:
+			patterns = pattern
+		l = []
+		for pattern in patterns:
+			try:
+				items = subprocess.check_output(f"find \"{path}\" -name \"{pattern}\"", shell=True).decode().strip().splitlines()
+				l += items
+			except Exception as e:
+				txt = f"filesystem.find():Error - {e}"
+				log(txt, 'error')
+				return []
+		return l
+
+	def cat(self, filepath=None):
+		data = ''
+		if os.path.exists(filepath):
+			with open(filepath, 'r') as f:
+				data = f.read()
+				f.close()
+			return data
+		else:
+			txt = f"filesystem.cat():Error - File doesn't exist ({filepath})!"
 			log(txt, 'error')
-			return []
-			
+		
