@@ -2,7 +2,7 @@ import subprocess
 import tarfile
 import glob
 import os
-from log import logger
+from helper_utils.log import logger
 logfile = os.path.join(os.path.expanduser("~"), 'new_project_helper.log')
 logger = logger(logfile=logfile, verbose=True)
 log = logger.log_msg
@@ -127,7 +127,7 @@ class tar():
 		for filepath in files:
 			fname = os.path.basename(filepath)
 			arcname = os.path.join(path, filepath.split(path)[1])
-			print("arcname:", arcname)
+			#print("arcname:", arcname)
 			fp.add(filepath, arcname=arcname)
 			log(f"tar.add_directory():Added to archive '{tar_file}': '{filepath}'", 'info')
 		fp.close()
