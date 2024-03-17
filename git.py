@@ -1010,7 +1010,7 @@ class git_mgr():
 		paths = self.fs.find(path=self.path, pattern="__pycache__")
 		for path in paths:
 			try:
-				self.fs.rm(path)
+				self.fs.rm(path, force=True)
 			except Exception as e:
 				self.log(f"git.rm_junk_files():Error - {e}", 'error')
 				return False
