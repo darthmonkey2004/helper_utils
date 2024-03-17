@@ -92,7 +92,34 @@ def get_repositories(user='darthmonkey2004'):
 
 
 class git_mgr():
-	def __init__(self, path=None, url=None, init=False, email=None, name=None, token=None, store_type='local', update=True, safe=True):
+	def __init__(self, path=None, url=None, init=False, localuser=None, email=None, user=None, token=None, store_type='local', update=True, safe=True, name=None):
+		if localuser is None:
+			localuser = os.getlogin()
+		self.user = localuser
+		self.email = email
+		self.sh(f"git config --global user.email = \"{self.email}\"")
+		if name is not None:
+			self.sh(f"git config --global user.name = name")
+		else:
+			name = self.email.split('@')[0]
+			self.name = name
+			self.sh(f"git config --global user.name = self.name")
+		if user is None:
+			if self.email is not None:
+				self.user = self.email.split('@')[0]
+			else:
+				self.email = input("Enter github email...: ")
+				self.user = self.email.split('@')[0]
+		else:
+			self.user = user
+		if token is None:
+			try:
+				self.token = self.get_token(email=email)
+			except Exception as e:
+				print(f"Error getting token: {e}")
+				self.token = input("Enter token: ")
+		os.environ['GIT_TOKEN'] = self.token
+		self.fs = filesystem()
 		self.path = path
 		self.logfile = os.path.join(os.path.expanduser("~"), "gitlog.log")
 		self.log = logger(logfile=self.logfile, verbose=True).log_msg
@@ -104,15 +131,14 @@ class git_mgr():
 			self.settings = self.load_settings()
 			if self.path is not None:
 				os.chdir(self.path)
-		self.update = update
-		self.update_needed = False
+		self.UPDATE = update
+		self.UPDATE_needed = False
 		self.test_git()
 		self.store_type = store_type
 		self.push_needed = False
 		self.commit_needed = False
 		self.email = None
 		self.user = None
-		self.fs = filesystem()
 		cont = True
 		if path is not None:
 			valid, msg = self.is_repo(self.path)
@@ -287,7 +313,11 @@ class git_mgr():
 		vars = ['bare', 'branch', 'commit_needed', 'email', 'fetch', 'filemode', 'fs', 'name', 'path', 'remote_branch', 'repo_fmt_version', 'token_store_file', 'url', 'user']
 		d = {}
 		for var in vars:
-			d[var] = self.__dict__[var]
+			try:
+				d[var] = self.__dict__[var]
+			except Exception as e:
+				self.log(f"Key not initialized: {var}!", 'warning')
+				d[var] = None
 		d['initialized'] = True
 		self._save_settings(settings=d, settings_file=self.settings_file)
 		return self.settings
@@ -696,14 +726,19 @@ class git_mgr():
 			self.remote_branch = None
 			self.branch = self.get_current_branch()
 
-	def _environ_token(self):
-		try:
+	def _environ_token(self, token=None):
+		if token is not None:
+			self.store_token(email=self.email, token=token)
 			token = str(os.environ['GIT_TOKEN'])
-			self.store_token(token=token)
-		except Exception as e:
-			txt = f"Error in environment variable token test:{e}"
-			raise Exception(Exception, txt)
-		return token
+			return token
+		else:
+			try:
+				token = str(os.environ['GIT_TOKEN'])
+				self.store_token(token=token)
+			except Exception as e:
+				txt = f"Error in environment variable token test:{e}"
+				token = self.get_token(email=self.email)
+			return token
 
 
 	def _set(self, key, val, store_type=None):
@@ -790,8 +825,8 @@ class git_mgr():
 
 	def status(self, update=None):
 		if update is not None:
-			self.update = update
-		if self.update:
+			self.UPDATE = update
+		if self.UPDATE:
 			com = f"cd \"{self.path}\"; git fetch origin"
 			ret, data = self.sh(com)
 		com = f"cd \"{self.path}\"; git status"
@@ -810,7 +845,7 @@ class git_mgr():
 			elif 'untracked files present' in line or 'Changes not staged for commit' in line:
 				self.commit_needed = True
 			elif 'Your branch is behind' in line:
-				if self.update:
+				if self.UPDATE:
 					print("Local repository needs updated! Updating now... (update=True)")
 					self._pull()
 		print(f"branch:{self.branch}, self.commit_needed:{self.commit_needed}, push_needed:{self.push_needed}")
@@ -846,9 +881,7 @@ class git_mgr():
 			ret = e
 			return False, e
 
-	def store_token(self, token=None, user=None, email=None):# user is git Name, email is git email(for login)
-		if user is not None:
-			self.user = user
+	def store_token(self, token=None, email=None):# user is git Name, email is git email(for login)
 		if email is not None:
 			self.email = email
 		if token is None:
@@ -858,7 +891,6 @@ class git_mgr():
 				self.token = token1
 		else:
 			self.token = token
-		
 		keyring.set_password(service_name="git_token", username=self.email, password=self.token)
 		fname = os.path.join(os.path.expanduser("~"), 'git_token.txt')
 		com = f"cd \"{self.path}\"; git config --local credential.credentialStore plaintext"
@@ -869,16 +901,14 @@ class git_mgr():
 		os.environ['GCM_PLAINTEXT_STORE_PATH'] = fname
 		return self.token
 
-	def get_token(self, user=None, email=None):
-		if name is not None:
+	def get_token(self, email=None):
+		if email is not None:
 			self.email = email
-		if user is not None:
-			self.user = user
 		try:
 			self.token = keyring.get_password(service_name="git_token", username=self.email)
 		except Exception as e:
-			print("Error getting token:", e)
-			self.token = self.store_token(user=self.user, email=self.email)
+			txt = f"Error getting token: {e}"
+			raise Exception(txt)
 		return self.token
 
 	def _commit(self, commit_message=None):
