@@ -34,9 +34,15 @@ os.environ['GCM_PLAINTEXT_STORE_PATH'] = token_store_file
 def set_gitdir():
 	base_dir = os.getcwd()
 	path = None
-	com = f"ls -d *.git"
+	com = f"find \"$(pwd)\" -name \"*.git\""
 	try:
-		path = subprocess.check_output(com, shell=True).decode().strip()
+		path = subprocess.check_output(com, shell=True).decode().strip().splitlines()
+		if len(path) > 1:
+			for p in path:
+				idx = path.index(p)
+				print(f"{idx}. {p}")
+			pidx = input("Plese pick a git repo: ")
+			path = int(path[pidx - 1])
 	except Exception as e:
 		print(f"Error: {e}")
 	if path is None:
