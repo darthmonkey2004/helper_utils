@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import git_actions
 import pickle
 from helper_utils.filesystem import filesystem
 from helper_utils.log import logger
@@ -96,20 +97,26 @@ def get_repositories(user='darthmonkey2004'):
 			data[name]['updated']['string'] = updated_string
 	return data
 
+def get_actions():
+	actions = [item for item in dir(git_actions) if '_' not in item and 'sh' not in item]
+	return actions
 
 class git_mgr():
 	def __init__(self, path=None, url=None, init=False, localuser=None, email=None, user=None, token=None, store_type='local', update=True, safe=True, name=None):
 		if localuser is None:
 			localuser = os.getlogin()
 		self.user = localuser
-		self.email = email
-		self.sh(f"git config --global user.email = \"{self.email}\"")
+		if email is not None:
+			self.email = email
+			self.sh(f"git config --global --replace-all user.email = \"{self.email}\"")
+		else:
+			_, self.email = self.sh(f"git config --global -l | grep \"user.email\"")
 		if name is not None:
-			self.sh(f"git config --global user.name = name")
+			self.sh(f"git config --global --replace-all user.name = name")
 		else:
 			name = self.email.split('@')[0]
 			self.name = name
-			self.sh(f"git config --global user.name = self.name")
+			self.sh(f"git config --global --replace-all user.name = self.name")
 		if user is None:
 			if self.email is not None:
 				self.user = self.email.split('@')[0]
@@ -179,6 +186,8 @@ class git_mgr():
 				#raise Exception(Exception, msg)
 			else:
 				self.add_local_repo()
+		for a in get_actions():
+			self.__dict__[a] = git_actions.__dict__[a]
 
 
 	def add_local_repo(self, path=None, token=None):

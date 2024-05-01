@@ -3,6 +3,7 @@ import os
 import subprocess
 import shutil
 from helper_utils.log import *
+from helper_utils.filestats import *
 logger = logger(verbose=True)
 log = logger.log_msg
 
@@ -13,6 +14,9 @@ class filesystem():
 			self.cwd = os.getcwd()
 		else:
 			self.cwd = cwd
+
+	def fileStats(self, filepath):
+		return fileStats(filepath)
 
 	def copy(self, src_path, dest_path, overwrite=None):
 		if overwrite is None:
